@@ -4,3 +4,5 @@ package-lock.json
 screenshots/
 test-mobile.mjs
 *.md
+*temp
+*firebase_users
