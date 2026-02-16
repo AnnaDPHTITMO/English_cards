@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>English Cards</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin: 24px 0 8px;
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+      padding: 0 16px 32px;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ---------- File Select Screen ---------- */
+
+    .file-list {
+      width: 100%;
+      list-style: none;
+      margin-top: 16px;
+    }
+
+    .file-list li {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      cursor: pointer;
+      transition: transform .15s;
+    }
+
+    .file-list li:active {
+      transform: scale(.97);
+    }
+
+    .file-name {
+      font-weight: 600;
+      font-size: 1.05rem;
+    }
+
+    .file-progress {
+      font-size: .85rem;
+      color: #666;
+    }
+
+    /* ---------- Mode Select Screen ---------- */
+
+    .mode-btn-group {
+      width: 100%;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mode-btn {
+      padding: 18px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform .15s, background .2s;
+      color: #fff;
+    }
+
+    .mode-btn:active { transform: scale(.97); }
+
+    .mode-btn.flip { background: #4361ee; }
+    .mode-btn.quiz { background: #7209b7; }
+    .mode-btn.reset { background: #e5e5e5; color: #333; font-size: .95rem; padding: 14px; }
+
+    .back-link {
+      margin-top: 16px;
+      font-size: .95rem;
+      color: #4361ee;
+      cursor: pointer;
+      border: none;
+      background: none;
+      text-decoration: underline;
+      padding: 8px;
+    }
+
+    /* ---------- Flip Card Screen ---------- */
+
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: #ddd;
+      border-radius: 3px;
+      margin: 16px 0 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #4361ee;
+      border-radius: 3px;
+      transition: width .3s;
+    }
+
+    .progress-text {
+      font-size: .85rem;
+      color: #666;
+      margin-bottom: 16px;
+    }
+
+    .card-container {
+      width: 100%;
+      height: 220px;
+      perspective: 800px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform .5s;
+    }
+
+    .card.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+
+    .card-front {
+      background: #fff;
+    }
+
+    .card-back {
+      background: #4361ee;
+      color: #fff;
+      transform: rotateY(180deg);
+    }
+
+    .card-word {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .card-hint {
+      font-size: .85rem;
+      color: #999;
+      margin-top: 12px;
+    }
+
+    .card-back .card-hint {
+      color: rgba(255,255,255,.7);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .card-actions button {
+      flex: 1;
+      padding: 16px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform .15s;
+    }
+
+    .card-actions button:active { transform: scale(.97); }
+
+    .btn-know {
+      background: #2dc653;
+      color: #fff;
+    }
+
+    .btn-dont-know {
+      background: #ef233c;
+      color: #fff;
+    }
+
+    /* ---------- Quiz Screen ---------- */
+
+    .quiz-score {
+      font-size: .95rem;
+      color: #666;
+      margin: 16px 0 8px;
+    }
+
+    .quiz-word {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 16px 0 24px;
+      text-align: center;
+    }
+
+    .quiz-options {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .quiz-option {
+      padding: 16px 20px;
+      font-size: 1.05rem;
+      background: #fff;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s, transform .15s;
+      text-align: left;
+    }
+
+    .quiz-option:active { transform: scale(.98); }
+
+    .quiz-option.correct {
+      background: #d4edda;
+      border-color: #2dc653;
+    }
+
+    .quiz-option.wrong {
+      background: #f8d7da;
+      border-color: #ef233c;
+    }
+
+    .quiz-option.disabled {
+      pointer-events: none;
+    }
+
+    /* ---------- Done Screen ---------- */
+
+    .done-icon {
+      font-size: 4rem;
+      margin: 32px 0 16px;
+    }
+
+    .done-message {
+      font-size: 1.2rem;
+      text-align: center;
+      color: #333;
+      margin-bottom: 24px;
+    }
+
+    .done-btn {
+      padding: 16px 32px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      background: #4361ee;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: transform .15s;
+    }
+
+    .done-btn:active { transform: scale(.97); }
+  </style>
+</head>
+<body>
+
+  <!-- FILE SELECT -->
+  <div id="screen-files" class="screen active">
+    <h1>English Cards</h1>
+    <p style="color:#666; font-size:.9rem; margin-top:4px;">Choose a word set</p>
+    <ul id="file-list" class="file-list"></ul>
+  </div>
+
+  <!-- MODE SELECT -->
+  <div id="screen-mode" class="screen">
+    <h1 id="mode-title">words</h1>
+    <div class="mode-btn-group">
+      <button class="mode-btn flip" onclick="startFlip()">Flip Cards</button>
+      <button class="mode-btn quiz" onclick="startQuiz()">Quiz</button>
+      <button class="mode-btn reset" onclick="resetProgress()">Reset Progress</button>
+    </div>
+    <button class="back-link" onclick="showScreen('screen-files')">&larr; Back</button>
+  </div>
+
+  <!-- FLIP CARD -->
+  <div id="screen-flip" class="screen">
+    <h1>Flip Cards</h1>
+    <div class="progress-bar-container">
+      <div id="flip-progress-bar" class="progress-bar" style="width:0%"></div>
+    </div>
+    <p id="flip-progress-text" class="progress-text"></p>
+
+    <div class="card-container" onclick="flipCard()">
+      <div id="flip-card" class="card">
+        <div class="card-face card-front">
+          <div id="flip-word" class="card-word"></div>
+          <div class="card-hint">Tap to flip</div>
+        </div>
+        <div class="card-face card-back">
+          <div id="flip-translation" class="card-word"></div>
+          <div class="card-hint">Translation</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-actions">
+      <button class="btn-dont-know" onclick="flipAnswer(false)">Don't Know</button>
+      <button class="btn-know" onclick="flipAnswer(true)">Know</button>
+    </div>
+    <button class="back-link" onclick="showScreen('screen-mode')">&larr; Back</button>
+  </div>
+
+  <!-- QUIZ -->
+  <div id="screen-quiz" class="screen">
+    <h1>Quiz</h1>
+    <p id="quiz-score" class="quiz-score"></p>
+    <div id="quiz-word" class="quiz-word"></div>
+    <div id="quiz-options" class="quiz-options"></div>
+    <button class="back-link" onclick="showScreen('screen-mode')">&larr; Back</button>
+  </div>
+
+  <!-- DONE -->
+  <div id="screen-done" class="screen">
+    <div class="done-icon">&#127881;</div>
+    <div id="done-message" class="done-message"></div>
+    <button class="done-btn" onclick="showScreen('screen-mode')">Back to Menu</button>
+    <button class="done-btn" style="background:#2dc653" onclick="restartMode()">Practice Again</button>
+  </div>
+
+<script>
+  // ---- State ----
+  let allWords = [];       // [{word, translation}, ...]
+  let currentFile = '';
+  let lastMode = '';
+
+  // Flip state
+  let flipQueue = [];
+  let flipIndex = 0;
+  let flipLearned = 0;
+
+  // Quiz state
+  let quizQueue = [];
+  let quizIndex = 0;
+  let quizCorrect = 0;
+  let quizTotal = 0;
+
+  // ---- Screens ----
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ---- CSV Parsing ----
+  function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    const words = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const parts = line.split(',');
+      if (parts.length < 2) continue;
+      const word = parts[0].trim();
+      const translation = parts.slice(1).join(',').trim();
+      // Skip header row
+      if (i === 0 && /^[a-z]+$/i.test(word) && /^[a-z]+$/i.test(translation)) continue;
+      words.push({ word, translation });
+    }
+    return words;
+  }
+
+  // ---- Progress (localStorage) ----
+  function getProgress(file) {
+    const data = localStorage.getItem('ec_progress_' + file);
+    return data ? JSON.parse(data) : [];
+  }
+
+  function saveProgress(file, learnedWords) {
+    localStorage.setItem('ec_progress_' + file, JSON.stringify(learnedWords));
+  }
+
+  function resetProgress() {
+    if (confirm('Reset all progress for this word set?')) {
+      localStorage.removeItem('ec_progress_' + currentFile);
+      document.getElementById('mode-title').textContent =
+        currentFile.replace('.csv', '') + ' (0/' + allWords.length + ' learned)';
+    }
+  }
+
+  // ---- Shuffle ----
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // ---- File Selection ----
+  async function init() {
+    try {
+      const res = await fetch('words/files.json');
+      const files = await res.json();
+      const list = document.getElementById('file-list');
+      list.innerHTML = '';
+
+      for (const file of files) {
+        const li = document.createElement('li');
+        const csvRes = await fetch('words/' + file);
+        const csvText = await csvRes.text();
+        const words = parseCSV(csvText);
+        const learned = getProgress(file);
+        const learnedCount = learned.filter(w => words.some(ww => ww.word === w)).length;
+
+        li.innerHTML = `
+          <div>
+            <div class="file-name">${file.replace('.csv', '')}</div>
+            <div class="file-progress">${learnedCount} / ${words.length} learned</div>
+          </div>
+          <div style="font-size:1.4rem; color:#999">&rsaquo;</div>
+        `;
+        li.onclick = () => selectFile(file, words);
+        list.appendChild(li);
+      }
+    } catch (e) {
+      document.getElementById('file-list').innerHTML =
+        '<li style="color:#ef233c; justify-content:center">Failed to load word files. Make sure you\'re running a local server.</li>';
+    }
+  }
+
+  function selectFile(file, words) {
+    currentFile = file;
+    allWords = words;
+    const learned = getProgress(file);
+    const learnedCount = learned.filter(w => words.some(ww => ww.word === w)).length;
+    document.getElementById('mode-title').textContent =
+      file.replace('.csv', '') + ' (' + learnedCount + '/' + words.length + ' learned)';
+    showScreen('screen-mode');
+  }
+
+  // ---- Flip Card Mode ----
+  function startFlip() {
+    lastMode = 'flip';
+    const learned = getProgress(currentFile);
+    const unlearned = allWords.filter(w => !learned.includes(w.word));
+
+    if (unlearned.length === 0) {
+      showDone('You\'ve learned all the words!', allWords.length, allWords.length);
+      return;
+    }
+
+    flipQueue = shuffle(unlearned);
+    flipIndex = 0;
+    flipLearned = 0;
+    showScreen('screen-flip');
+    renderFlipCard();
+  }
+
+  function renderFlipCard() {
+    const card = document.getElementById('flip-card');
+    card.classList.remove('flipped');
+    const w = flipQueue[flipIndex];
+    document.getElementById('flip-word').textContent = w.word;
+    document.getElementById('flip-translation').textContent = w.translation;
+
+    const total = flipQueue.length;
+    const pct = Math.round((flipIndex / total) * 100);
+    document.getElementById('flip-progress-bar').style.width = pct + '%';
+    document.getElementById('flip-progress-text').textContent =
+      (flipIndex + 1) + ' / ' + total + ' remaining';
+  }
+
+  function flipCard() {
+    document.getElementById('flip-card').classList.toggle('flipped');
+  }
+
+  function flipAnswer(known) {
+    if (known) {
+      const learned = getProgress(currentFile);
+      const word = flipQueue[flipIndex].word;
+      if (!learned.includes(word)) {
+        learned.push(word);
+        saveProgress(currentFile, learned);
+      }
+      flipLearned++;
+    }
+
+    flipIndex++;
+    if (flipIndex >= flipQueue.length) {
+      const learned = getProgress(currentFile);
+      showDone(
+        'Session complete! You knew ' + flipLearned + ' out of ' + flipQueue.length + ' words.',
+        learned.length, allWords.length
+      );
+    } else {
+      renderFlipCard();
+    }
+  }
+
+  // ---- Quiz Mode ----
+  function startQuiz() {
+    lastMode = 'quiz';
+    const learned = getProgress(currentFile);
+    const unlearned = allWords.filter(w => !learned.includes(w.word));
+
+    if (unlearned.length === 0) {
+      showDone('You\'ve learned all the words!', allWords.length, allWords.length);
+      return;
+    }
+
+    quizQueue = shuffle(unlearned);
+    quizIndex = 0;
+    quizCorrect = 0;
+    quizTotal = 0;
+    showScreen('screen-quiz');
+    renderQuiz();
+  }
+
+  function renderQuiz() {
+    const w = quizQueue[quizIndex];
+    document.getElementById('quiz-word').textContent = w.word;
+    document.getElementById('quiz-score').textContent =
+      'Score: ' + quizCorrect + ' / ' + quizTotal + '  |  ' + (quizIndex + 1) + ' of ' + quizQueue.length;
+
+    // Build options: 1 correct + 3 distractors
+    const distractors = allWords
+      .filter(d => d.word !== w.word)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+
+    const options = shuffle([w, ...distractors]);
+    const container = document.getElementById('quiz-options');
+    container.innerHTML = '';
+
+    options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'quiz-option';
+      btn.textContent = opt.translation;
+      btn.onclick = () => quizAnswer(btn, opt.word === w.word, w.word);
+      container.appendChild(btn);
+    });
+  }
+
+  function quizAnswer(btn, isCorrect, correctWord) {
+    quizTotal++;
+    const buttons = document.querySelectorAll('.quiz-option');
+    buttons.forEach(b => b.classList.add('disabled'));
+
+    if (isCorrect) {
+      btn.classList.add('correct');
+      quizCorrect++;
+      // Mark as learned
+      const learned = getProgress(currentFile);
+      if (!learned.includes(correctWord)) {
+        learned.push(correctWord);
+        saveProgress(currentFile, learned);
+      }
+    } else {
+      btn.classList.add('wrong');
+      // Highlight correct answer
+      buttons.forEach(b => {
+        const correctTranslation = allWords.find(w => w.word === correctWord).translation;
+        if (b.textContent === correctTranslation) b.classList.add('correct');
+      });
+    }
+
+    setTimeout(() => {
+      quizIndex++;
+      if (quizIndex >= quizQueue.length) {
+        const learned = getProgress(currentFile);
+        showDone(
+          'Quiz done! Score: ' + quizCorrect + ' / ' + quizTotal,
+          learned.length, allWords.length
+        );
+      } else {
+        renderQuiz();
+      }
+    }, 1200);
+  }
+
+  // ---- Done Screen ----
+  function showDone(message, learnedCount, totalCount) {
+    document.getElementById('done-message').textContent =
+      message + '\n\nTotal progress: ' + learnedCount + ' / ' + totalCount + ' words learned.';
+    showScreen('screen-done');
+  }
+
+  function restartMode() {
+    if (lastMode === 'flip') startFlip();
+    else if (lastMode === 'quiz') startQuiz();
+  }
+
+  // ---- Init ----
+  init();
+</script>
+</body>
+</html>
