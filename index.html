@@ -571,6 +571,8 @@ const uidToUsername = {
   let currentFile = '';
   let lastMode = '';
 
+  let filesLoadedOnce = false;   // <--- add this
+
   // Flip state
   let flipQueue = [];
   let flipIndex = 0;
@@ -586,6 +588,11 @@ const uidToUsername = {
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    // Update file list when going back to files screen
+    if (id === 'screen-files') {
+      filesLoadedOnce = false;    // allow rebuild when returning home
+      updateFileList();
+    }
   }
 
   // ---- CSV Parsing ----
@@ -640,34 +647,36 @@ const uidToUsername = {
 
   // ---- File Selection ----
   async function init() {
-    try {
-      const res = await fetch('words/files.json');
-      const files = await res.json();
-      const list = document.getElementById('file-list');
-      list.innerHTML = '';
 
-      for (const file of files) {
-        const li = document.createElement('li');
-        const csvRes = await fetch('words/' + file);
-        const csvText = await csvRes.text();
-        const words = parseCSV(csvText);
-        const learned = getProgress(file);
-        const learnedCount = learned.filter(w => words.some(ww => ww.word === w)).length;
+    await updateFileList();
+    // try {
+    //   const res = await fetch('words/files.json');
+    //   const files = await res.json();
+    //   const list = document.getElementById('file-list');
+    //   list.innerHTML = '';
 
-        li.innerHTML = `
-          <div>
-            <div class="file-name">${file.replace('.csv', '')}</div>
-            <div class="file-progress">${learnedCount} / ${words.length} learned</div>
-          </div>
-          <div style="font-size:1.4rem; color:#999">&rsaquo;</div>
-        `;
-        li.onclick = () => selectFile(file, words);
-        list.appendChild(li);
-      }
-    } catch (e) {
-      document.getElementById('file-list').innerHTML =
-        '<li style="color:#ef233c; justify-content:center">Failed to load word files. Make sure you\'re running a local server.</li>';
-    }
+    //   for (const file of files) {
+    //     const li = document.createElement('li');
+    //     const csvRes = await fetch('words/' + file);
+    //     const csvText = await csvRes.text();
+    //     const words = parseCSV(csvText);
+    //     const learned = getProgress(file);
+    //     const learnedCount = learned.filter(w => words.some(ww => ww.word === w)).length;
+
+    //     li.innerHTML = `
+    //       <div>
+    //         <div class="file-name">${file.replace('.csv', '')}</div>
+    //         <div class="file-progress">${learnedCount} / ${words.length} learned</div>
+    //       </div>
+    //       <div style="font-size:1.4rem; color:#999">&rsaquo;</div>
+    //     `;
+    //     li.onclick = () => selectFile(file, words);
+    //     list.appendChild(li);
+    //   }
+    // } catch (e) {
+    //   document.getElementById('file-list').innerHTML =
+    //     '<li style="color:#ef233c; justify-content:center">Failed to load word files. Make sure you\'re running a local server.</li>';
+    // }
   }
 
   function selectFile(file, words) {
@@ -679,6 +688,42 @@ const uidToUsername = {
       file.replace('.csv', '') + ' (' + learnedCount + '/' + words.length + ' learned)';
     showScreen('screen-mode');
   }
+
+  // Update file list display with current progress
+  async function updateFileList() {
+  if (filesLoadedOnce) return;      // <--- prevent double build on login
+  filesLoadedOnce = true;
+
+  try {
+    const res = await fetch('words/files.json');
+    const files = await res.json();
+    const list = document.getElementById('file-list');
+    list.innerHTML = '';
+
+    for (const file of files) {
+      const csvRes = await fetch('words/' + file);
+      const csvText = await csvRes.text();
+      const words = parseCSV(csvText);
+      const learned = getProgress(file);
+      const learnedCount = learned.filter(w => words.some(ww => ww.word === w)).length;
+
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div>
+          <div class="file-name">${file.replace('.csv', '')}</div>
+          <div class="file-progress">${learnedCount} / ${words.length} learned</div>
+        </div>
+        <div style="font-size:1.4rem; color:#999">&rsaquo;</div>
+      `;
+      li.onclick = () => selectFile(file, words);
+      list.appendChild(li);
+    }
+  } catch (e) {
+    document.getElementById('file-list').innerHTML =
+      '<li style="color:#ef233c; justify-content:center">Failed to load word files.</li>';
+  }
+}
+
 
   // ---- Flip Card Mode ----
   function startFlip() {
@@ -718,18 +763,21 @@ const uidToUsername = {
 
   function flipAnswer(known) {
   const currentWord = flipQueue[flipIndex].word;
-  
+
   // Save card result to Firebase
   saveCardResult(currentFile + '_' + currentWord, known);
-  
+
   if (known) {
     const learned = getProgress(currentFile);
     if (!learned.includes(currentWord)) {
       learned.push(currentWord);
       saveProgress(currentFile, learned);
+      // Update mode title with new learned count
+      document.getElementById('mode-title').textContent =
+        currentFile.replace('.csv', '') + ' (' + learned.length + '/' + allWords.length + ' learned)';
     }
     flipLearned++;
-    } 
+    }
 
 
     flipIndex++;
@@ -801,6 +849,9 @@ const uidToUsername = {
       if (!learned.includes(correctWord)) {
         learned.push(correctWord);
         saveProgress(currentFile, learned);
+        // Update mode title with new learned count
+        document.getElementById('mode-title').textContent =
+          currentFile.replace('.csv', '') + ' (' + learned.length + '/' + allWords.length + ' learned)';
       }
     } else {
       btn.classList.add('wrong');

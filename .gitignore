@@ -6,3 +6,5 @@ test-mobile.mjs
 *.md
 *temp
 *firebase_users
+.claude
+.playwright-mcp
