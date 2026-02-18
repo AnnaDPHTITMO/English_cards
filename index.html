@@ -973,53 +973,61 @@ async function saveQuizResult(quizId, score, total) {
 
 async function getAllUsersStats() {
   try {
-    // REPLACE THESE WITH YOUR ACTUAL USER UIDs FROM FIREBASE CONSOLE
     const userIds = [
-      "HNn9M03k1ZSsMTlNU4kjkLUn6B42",  // user1 - REPLACE THIS
-      "H7QqXqm5otcY6rkKF0ZQztqCYG72",              // user2 - REPLACE THIS
-      "nDEm8J6XDARkKRTFMkwccqMBJwx1"               // user3 - REPLACE THIS
+      "HNn9M03k1ZSsMTlNU4kjkLUn6B42",  // user1
+      "H7QqXqm5otcY6rkKF0ZQztqCYG72",  // user2
+      "nDEm8J6XDARkKRTFMkwccqMBJwx1"   // user3
     ];
-    
+
+    const filesRes = await fetch('words/files.json?t=' + Date.now());
+    const files = await filesRes.json();
+    const totalAvailable = files.length;
+
     const stats = [];
-    
+
     for (const userId of userIds) {
-      console.log("Fetching results for user:", userId);
-      
       const resultsSnapshot = await db.collection("users")
         .doc(userId)
         .collection("results")
         .get();
-      
-      console.log("User", userId, "has", resultsSnapshot.docs.length, "results");
-      
-      let quizCount = 0;
-      let quizTotalScore = 0;
-      let quizTotalQuestions = 0;
 
+      // Group by quizId, keep only the latest result per quiz
+      const latestByQuiz = {};
       resultsSnapshot.docs.forEach(doc => {
         const data = doc.data();
-
         if (data.type === "quiz") {
-          quizCount++;
-          quizTotalScore += data.score || 0;
-          quizTotalQuestions += data.total || 0;
+          const prev = latestByQuiz[data.quizId];
+          if (!prev || data.createdAt > prev.createdAt) {
+            latestByQuiz[data.quizId] = data;
+          }
         }
       });
 
-      const quizAverage = quizTotalQuestions > 0
-        ? Math.round((quizTotalScore / quizTotalQuestions) * 100)
+      const latestResults = Object.values(latestByQuiz);
+      const completedCount = latestResults.length;
+      let sumScore = 0;
+      let sumTotal = 0;
+      latestResults.forEach(r => {
+        sumScore += r.score || 0;
+        sumTotal += r.total || 0;
+      });
+
+      const quizAverage = sumTotal > 0
+        ? Math.round((sumScore / sumTotal) * 100)
+        : 0;
+      const combinedScore = totalAvailable > 0
+        ? Math.round(quizAverage * (completedCount / totalAvailable))
         : 0;
 
       stats.push({
-        userId: userId,
-        quizCount,
+        userId,
         quizAverage,
-        totalScore: quizTotalScore,
-        totalQuestions: quizTotalQuestions
+        completedCount,
+        totalAvailable,
+        combinedScore
       });
     }
-    
-    console.log("Final stats array:", stats);
+
     return stats;
   } catch (e) {
     console.error("Error fetching stats:", e);
@@ -1031,33 +1039,49 @@ async function getAllUsersStats() {
 async function getMyStats() {
   const user = auth.currentUser;
   if (!user) return null;
-  
+
   try {
+    const filesRes = await fetch('words/files.json?t=' + Date.now());
+    const files = await filesRes.json();
+    const totalAvailable = files.length;
+
     const resultsSnapshot = await db.collection("users")
       .doc(user.uid)
       .collection("results")
       .get();
-    
-    let quizCount = 0;
-    let quizTotalScore = 0;
-    let quizTotalQuestions = 0;
 
+    const latestByQuiz = {};
     resultsSnapshot.docs.forEach(doc => {
       const data = doc.data();
       if (data.type === "quiz") {
-        quizCount++;
-        quizTotalScore += data.score || 0;
-        quizTotalQuestions += data.total || 0;
+        const prev = latestByQuiz[data.quizId];
+        if (!prev || data.createdAt > prev.createdAt) {
+          latestByQuiz[data.quizId] = data;
+        }
       }
     });
 
+    const latestResults = Object.values(latestByQuiz);
+    const completedCount = latestResults.length;
+    let sumScore = 0;
+    let sumTotal = 0;
+    latestResults.forEach(r => {
+      sumScore += r.score || 0;
+      sumTotal += r.total || 0;
+    });
+
+    const quizAverage = sumTotal > 0
+      ? Math.round((sumScore / sumTotal) * 100)
+      : 0;
+    const combinedScore = totalAvailable > 0
+      ? Math.round(quizAverage * (completedCount / totalAvailable))
+      : 0;
+
     return {
-      quizCount,
-      quizTotalScore,
-      quizTotalQuestions,
-      quizAverage: quizTotalQuestions > 0
-        ? Math.round((quizTotalScore / quizTotalQuestions) * 100)
-        : 0
+      quizAverage,
+      completedCount,
+      totalAvailable,
+      combinedScore
     };
   } catch (e) {
     console.error("Error fetching my stats:", e);
@@ -1074,47 +1098,42 @@ async function showStats() {
   const myStats = await getMyStats();
   const myStatsDiv = document.getElementById('my-stats-content');
   
-  if (myStats && myStats.quizCount > 0) {
+  if (myStats && myStats.completedCount > 0) {
     myStatsDiv.innerHTML = `
-      <p><strong>Quizzes completed:</strong> ${myStats.quizCount}</p>
-      <p><strong>Quiz average:</strong> ${myStats.quizAverage}% (${myStats.quizTotalScore}/${myStats.quizTotalQuestions})</p>
+      <p><strong>Quizzes completed:</strong> ${myStats.completedCount} / ${myStats.totalAvailable}</p>
+      <p><strong>Quiz average:</strong> ${myStats.quizAverage}%</p>
+      <p><strong>Rating:</strong> ${myStats.combinedScore}%</p>
     `;
   } else {
     myStatsDiv.innerHTML = '<p style="color:#999">No data yet. Start practicing!</p>';
   }
-  
+
   // Show leaderboard
   const allStats = await getAllUsersStats();
   const leaderboardDiv = document.getElementById('leaderboard-content');
-  
-  console.log("All stats:", allStats); // Debug line
-  
+
   if (allStats.length === 0) {
     leaderboardDiv.innerHTML = '<p style="color:#999">No users have completed any activities yet</p>';
     return;
   }
-  
-  // Filter out users with no activity
-  const activeStats = allStats.filter(s => s.quizCount > 0);
-  
+
+  const activeStats = allStats.filter(s => s.completedCount > 0);
+
   if (activeStats.length === 0) {
     leaderboardDiv.innerHTML = '<p style="color:#999">No users have completed any activities yet</p>';
     return;
   }
-  
-  // Sort by quiz average (users with no quizzes go to bottom)
-  activeStats.sort((a, b) => {
-    if (a.quizCount === 0) return 1;
-    if (b.quizCount === 0) return -1;
-    return b.quizAverage - a.quizAverage;
-  });
-  
+
+  // Sort by combined score descending
+  activeStats.sort((a, b) => b.combinedScore - a.combinedScore);
+
   let html = '<table style="width:100%; border-collapse:collapse">';
   html += '<tr style="border-bottom:2px solid #eee; font-weight:600; color:#666; font-size:.85rem">';
   html += '<th style="text-align:left; padding:8px">Rank</th>';
   html += '<th style="text-align:left; padding:8px">User</th>';
-  html += '<th style="text-align:center; padding:8px">Quizzes</th>';
+  html += '<th style="text-align:center; padding:8px">Done</th>';
   html += '<th style="text-align:center; padding:8px">Avg %</th>';
+  html += '<th style="text-align:center; padding:8px">Rating</th>';
   html += '</tr>';
   
   activeStats.forEach((stat, index) => {
@@ -1128,8 +1147,9 @@ async function showStats() {
     html += `<tr style="background:${bgColor}; border-bottom:1px solid #eee">`;
     html += `<td style="padding:12px 8px; font-size:.9rem">${medal}${index + 1}</td>`;
     html += `<td style="padding:12px 8px; font-weight:${isMe ? '600' : '400'}; font-size:.9rem">${displayName}</td>`;
-    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.quizCount}</td>`;
-    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; font-weight:600; color:#4361ee">${stat.quizAverage}%</td>`;
+    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.completedCount}/${stat.totalAvailable}</td>`;
+    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.quizAverage}%</td>`;
+    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; font-weight:600; color:#4361ee">${stat.combinedScore}%</td>`;
     html += '</tr>';
   });
   
