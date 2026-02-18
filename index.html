@@ -425,6 +425,25 @@
     </div>
     <p id="flip-progress-text" class="progress-text"></p>
 
+    <!-- NEW: wrapper to position button relative to card -->
+   <div style="position: relative; width: 100%; margin-bottom: 20px;">
+    
+    <!-- 🔊 button: top-right, above the card -->
+    <button 
+      id="speak-btn"
+      onclick="speakWord(document.getElementById('flip-word').textContent)"
+      style="
+        position: absolute;
+        top: -36px;
+        right: 0;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        z-index: 10;
+        padding: 4px 8px;
+      ">🔊</button>
+
     <div class="card-container" onclick="flipCard()">
       <div id="flip-card" class="card">
         <div class="card-face card-front">
@@ -437,6 +456,7 @@
         </div>
       </div>
     </div>
+  </div>  <!-- ✅ closes the position:relative wrapper -->
 
     <div class="card-actions">
       <button class="btn-dont-know" onclick="flipAnswer(false)">Don't Know</button>
@@ -445,11 +465,34 @@
     <button class="back-link" onclick="showScreen('screen-mode')">&larr; Back</button>
   </div>
 
+
+
   <!-- QUIZ -->
   <div id="screen-quiz" class="screen">
     <h1>Quiz</h1>
     <p id="quiz-score" class="quiz-score"></p>
+
+    <!-- wrapper to position 🔊 button top-right above the word -->
+  <div style="position: relative; width: 100%;">
+
+    <button
+      onclick="speakWord(document.getElementById('quiz-word').textContent)"
+      style="
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        z-index: 10;
+        padding: 4px 8px;
+      ">🔊</button>
+
+
     <div id="quiz-word" class="quiz-word"></div>
+  </div>  <!-- ✅ closes relative wrapper -->
+  
     <div id="quiz-options" class="quiz-options"></div>
     <button class="back-link" onclick="showScreen('screen-mode')">&larr; Back</button>
   </div>
@@ -546,8 +589,9 @@ const uidToUsername = {
     currentUsername = user.email.split("@")[0];
     document.getElementById("current-user").textContent = currentUsername;
     document.getElementById("user-header").classList.add("visible");
-    showScreen("screen-files");
-    init();
+    filesLoadedOnce = false;   // ✅ reset BEFORE init
+    showScreen("screen-files"); // this calls updateFileList() internally
+
   }
 
   function showLogin() {
@@ -645,6 +689,17 @@ const uidToUsername = {
     return a;
   }
 
+  function speakWord(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel(); // stop any previous speech
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;  // slightly slower for learning
+  utterance.pitch = 1;
+  speechSynthesis.speak(utterance);
+}
+
+
   // ---- File Selection ----
   async function init() {
 
@@ -695,7 +750,7 @@ const uidToUsername = {
   filesLoadedOnce = true;
 
   try {
-    const res = await fetch('words/files.json');
+    const res = await fetch('words/files.json?t=' + Date.now());
     const files = await res.json();
     const list = document.getElementById('file-list');
     list.innerHTML = '';
@@ -755,6 +810,7 @@ const uidToUsername = {
     document.getElementById('flip-progress-bar').style.width = pct + '%';
     document.getElementById('flip-progress-text').textContent =
       (flipIndex + 1) + ' / ' + total + ' remaining';
+    speakWord(w.word);
   }
 
   function flipCard() {
@@ -816,7 +872,7 @@ const uidToUsername = {
     document.getElementById('quiz-word').textContent = w.word;
     document.getElementById('quiz-score').textContent =
       'Score: ' + quizCorrect + ' / ' + quizTotal + '  |  ' + (quizIndex + 1) + ' of ' + quizQueue.length;
-
+    speakWord(w.word);
     // Build options: 1 correct + 3 distractors
     const distractors = allWords
       .filter(d => d.word !== w.word)
@@ -834,6 +890,7 @@ const uidToUsername = {
       btn.onclick = () => quizAnswer(btn, opt.word === w.word, w.word);
       container.appendChild(btn);
     });
+    
   }
 
   function quizAnswer(btn, isCorrect, correctWord) {
