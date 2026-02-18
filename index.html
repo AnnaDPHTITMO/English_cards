@@ -820,9 +820,6 @@ const uidToUsername = {
   function flipAnswer(known) {
   const currentWord = flipQueue[flipIndex].word;
 
-  // Save card result to Firebase
-  saveCardResult(currentFile + '_' + currentWord, known);
-
   if (known) {
     const learned = getProgress(currentFile);
     if (!learned.includes(currentWord)) {
@@ -970,25 +967,6 @@ async function saveQuizResult(quizId, score, total) {
   }
 }
 
-async function saveCardResult(cardId, correct) {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  try {
-    await db.collection("users")
-      .doc(user.uid)
-      .collection("results")
-      .add({
-        type: "card",
-        cardId: cardId,
-        correct: correct,
-        createdAt: new Date().toISOString()
-      });
-    console.log("Card result saved for", currentUsername);
-  } catch (e) {
-    console.error("Error saving card result:", e);
-  }
-}
 // ---- Statistics Functions ----
 
 // ---- Statistics Functions ----
@@ -1017,36 +995,25 @@ async function getAllUsersStats() {
       let quizCount = 0;
       let quizTotalScore = 0;
       let quizTotalQuestions = 0;
-      let cardCount = 0;
-      let cardCorrect = 0;
-      
+
       resultsSnapshot.docs.forEach(doc => {
         const data = doc.data();
-        
+
         if (data.type === "quiz") {
           quizCount++;
           quizTotalScore += data.score || 0;
           quizTotalQuestions += data.total || 0;
-        } else if (data.type === "card") {
-          cardCount++;
-          if (data.correct) cardCorrect++;
         }
       });
-      
-      const quizAverage = quizTotalQuestions > 0 
-        ? Math.round((quizTotalScore / quizTotalQuestions) * 100) 
+
+      const quizAverage = quizTotalQuestions > 0
+        ? Math.round((quizTotalScore / quizTotalQuestions) * 100)
         : 0;
-      
-      const cardAccuracy = cardCount > 0 
-        ? Math.round((cardCorrect / cardCount) * 100) 
-        : 0;
-      
+
       stats.push({
         userId: userId,
         quizCount,
         quizAverage,
-        cardCount,
-        cardAccuracy,
         totalScore: quizTotalScore,
         totalQuestions: quizTotalQuestions
       });
@@ -1074,32 +1041,22 @@ async function getMyStats() {
     let quizCount = 0;
     let quizTotalScore = 0;
     let quizTotalQuestions = 0;
-    let cardCount = 0;
-    let cardCorrect = 0;
-    
+
     resultsSnapshot.docs.forEach(doc => {
       const data = doc.data();
       if (data.type === "quiz") {
         quizCount++;
         quizTotalScore += data.score || 0;
         quizTotalQuestions += data.total || 0;
-      } else if (data.type === "card") {
-        cardCount++;
-        if (data.correct) cardCorrect++;
       }
     });
-    
+
     return {
       quizCount,
       quizTotalScore,
       quizTotalQuestions,
-      quizAverage: quizTotalQuestions > 0 
-        ? Math.round((quizTotalScore / quizTotalQuestions) * 100) 
-        : 0,
-      cardCount,
-      cardCorrect,
-      cardAccuracy: cardCount > 0 
-        ? Math.round((cardCorrect / cardCount) * 100) 
+      quizAverage: quizTotalQuestions > 0
+        ? Math.round((quizTotalScore / quizTotalQuestions) * 100)
         : 0
     };
   } catch (e) {
@@ -1117,12 +1074,10 @@ async function showStats() {
   const myStats = await getMyStats();
   const myStatsDiv = document.getElementById('my-stats-content');
   
-  if (myStats && (myStats.quizCount > 0 || myStats.cardCount > 0)) {
+  if (myStats && myStats.quizCount > 0) {
     myStatsDiv.innerHTML = `
       <p><strong>Quizzes completed:</strong> ${myStats.quizCount}</p>
       <p><strong>Quiz average:</strong> ${myStats.quizAverage}% (${myStats.quizTotalScore}/${myStats.quizTotalQuestions})</p>
-      <p><strong>Cards practiced:</strong> ${myStats.cardCount}</p>
-      <p><strong>Card accuracy:</strong> ${myStats.cardAccuracy}% (${myStats.cardCorrect}/${myStats.cardCount})</p>
     `;
   } else {
     myStatsDiv.innerHTML = '<p style="color:#999">No data yet. Start practicing!</p>';
@@ -1140,7 +1095,7 @@ async function showStats() {
   }
   
   // Filter out users with no activity
-  const activeStats = allStats.filter(s => s.quizCount > 0 || s.cardCount > 0);
+  const activeStats = allStats.filter(s => s.quizCount > 0);
   
   if (activeStats.length === 0) {
     leaderboardDiv.innerHTML = '<p style="color:#999">No users have completed any activities yet</p>';
