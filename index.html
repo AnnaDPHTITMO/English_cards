@@ -176,14 +176,22 @@
     .mode-btn.reset { background: #e5e5e5; color: #333; font-size: .95rem; padding: 14px; }
 
     .back-link {
-      margin-top: 16px;
-      font-size: .95rem;
-      color: #4361ee;
-      cursor: pointer;
+      align-self: flex-start;
+      margin-top: 24px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #4361ee;
+      color: #fff;
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border: none;
-      background: none;
-      text-decoration: underline;
-      padding: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(67,97,238,.3);
+      text-decoration: none;
+      padding: 0;
     }
 
     /* ---------- Flip Card Screen ---------- */
@@ -348,6 +356,27 @@
       pointer-events: none;
     }
 
+    /* ---------- Settings Toggles ---------- */
+
+    .setting-toggle {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: .9rem;
+      font-weight: 600;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fff;
+      color: #666;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .setting-toggle.active {
+      border-color: #4361ee;
+      background: #eef0ff;
+      color: #4361ee;
+    }
+
     /* ---------- Done Screen ---------- */
 
     .done-icon {
@@ -376,6 +405,28 @@
     }
 
     .done-btn:active { transform: scale(.97); }
+
+    /* ---------- Quiz Done Animations ---------- */
+    @keyframes confetti-fall {
+      0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+    @keyframes firework-burst {
+      0% { transform: translate(0,0) scale(0); opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(1.5); opacity: 0; }
+    }
+    @keyframes bubble-float {
+      0% { transform: translateY(0) translateX(0); opacity: 1; }
+      25% { transform: translateY(-28vh) translateX(15px); }
+      50% { transform: translateY(-55vh) translateX(-15px); opacity: .8; }
+      75% { transform: translateY(-82vh) translateX(10px); }
+      100% { transform: translateY(-110vh) translateX(0); opacity: 0; }
+    }
+    .done-anim-particle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
@@ -409,12 +460,20 @@
   <!-- MODE SELECT -->
   <div id="screen-mode" class="screen">
     <h1 id="mode-title">words</h1>
+    <div style="width:100%; background:#fff; border-radius:12px; padding:16px 20px; margin-top:16px; box-shadow:0 1px 3px rgba(0,0,0,.08);">
+      <label style="font-size:.9rem; color:#666; display:block; margin-bottom:6px;">Timer per card</label>
+      <div id="timer-toggle" style="display:flex; gap:8px;">
+        <button class="setting-toggle" data-timer="5" onclick="setQuizTimer(5)">5s</button>
+        <button class="setting-toggle" data-timer="10" onclick="setQuizTimer(10)">10s</button>
+        <button class="setting-toggle active" data-timer="0" onclick="setQuizTimer(0)">Off</button>
+      </div>
+    </div>
     <div class="mode-btn-group">
       <button class="mode-btn flip" onclick="startFlip()">Flip Cards</button>
       <button class="mode-btn quiz" onclick="startQuiz()">Quiz</button>
       <button class="mode-btn reset" onclick="resetProgress()">Reset Progress</button>
     </div>
-    <button class="back-link" onclick="showScreen('screen-files')">&larr; Back</button>
+    <button class="back-link" onclick="showScreen('screen-files')">&larr;</button>
   </div>
 
   <!-- FLIP CARD -->
@@ -462,7 +521,7 @@
       <button class="btn-dont-know" onclick="flipAnswer(false)">Don't Know</button>
       <button class="btn-know" onclick="flipAnswer(true)">Know</button>
     </div>
-    <button class="back-link" onclick="showScreen('screen-mode')">&larr; Back</button>
+    <button class="back-link" onclick="showScreen('screen-mode')">&larr;</button>
   </div>
 
 
@@ -471,12 +530,15 @@
   <div id="screen-quiz" class="screen">
     <h1>Quiz</h1>
     <p id="quiz-score" class="quiz-score"></p>
+    <div id="quiz-timer" style="display:none; text-align:center; margin:4px 0 0;">
+      <span id="quiz-timer-text" style="font-size:1.3rem; font-weight:700; color:#666;"></span>
+    </div>
 
     <!-- wrapper to position 🔊 button top-right above the word -->
   <div style="position: relative; width: 100%;">
 
     <button
-      onclick="speakWord(document.getElementById('quiz-word').textContent)"
+      onclick="speakQuizWord()"
       style="
         position: absolute;
         top: 0;
@@ -494,15 +556,19 @@
   </div>  <!-- ✅ closes relative wrapper -->
   
     <div id="quiz-options" class="quiz-options"></div>
-    <button class="back-link" onclick="showScreen('screen-mode')">&larr; Back</button>
+    <button class="back-link" onclick="clearQuizTimer(); showScreen('screen-mode')">&larr;</button>
   </div>
 
   <!-- DONE -->
   <div id="screen-done" class="screen">
     <div class="done-icon">&#127881;</div>
     <div id="done-message" class="done-message"></div>
-    <button class="done-btn" onclick="showScreen('screen-mode')">Back to Menu</button>
-    <button class="done-btn" style="background:#2dc653" onclick="restartMode()">Practice Again</button>
+    <div id="done-encouragement" style="display:none; text-align:center; margin-top:16px;">
+      <div id="encourage-emojis-top" style="font-size:1.8rem; letter-spacing:6px;"></div>
+      <p id="encourage-text" style="font-size:1.2rem; font-weight:700; margin:8px 0; background:linear-gradient(90deg,#e040fb,#4361ee,#2dc653,#ff9100); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;"></p>
+      <div id="encourage-emojis-bottom" style="font-size:1.8rem; letter-spacing:6px;"></div>
+    </div>
+    <button class="done-btn" onclick="showScreen('screen-files')">Home</button>
   </div>
 
   <!-- STATISTICS / RANKING -->
@@ -523,7 +589,7 @@
     </div>
   </div>
   
-  <button class="back-link" onclick="showScreen('screen-files')">&larr; Back to Home</button>
+  <button class="back-link" onclick="showScreen('screen-files')">&larr;</button>
 </div>
 
 
@@ -628,6 +694,18 @@ const uidToUsername = {
   let quizCorrect = 0;
   let quizTotal = 0;
 
+  // Timer settings
+  let quizTimerSec = 0;
+  let quizTimerId = null;
+  let quizTimeLeft = 0;
+
+  function setQuizTimer(sec) {
+    quizTimerSec = sec;
+    document.querySelectorAll('#timer-toggle .setting-toggle').forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.timer) === sec);
+    });
+  }
+
   // ---- Screens ----
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -690,14 +768,34 @@ const uidToUsername = {
   }
 
   function speakWord(text) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel(); // stop any previous speech
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.9;  // slightly slower for learning
-  utterance.pitch = 1;
-  speechSynthesis.speak(utterance);
-}
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    speechSynthesis.speak(utterance);
+  }
+
+  function speakRussianWord(text) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ru-RU';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    speechSynthesis.speak(utterance);
+  }
+
+  function speakQuizWord() {
+    const q = quizQueue[quizIndex];
+    if (!q) return;
+    if (q.direction === 'ru-en') {
+      speakRussianWord(q.translation);
+    } else {
+      speakWord(q.word);
+    }
+  }
 
 
   // ---- File Selection ----
@@ -848,15 +946,15 @@ const uidToUsername = {
   // ---- Quiz Mode ----
   function startQuiz() {
     lastMode = 'quiz';
-    const learned = getProgress(currentFile);
-    const unlearned = allWords.filter(w => !learned.includes(w.word));
+    clearQuizTimer();
 
-    if (unlearned.length === 0) {
-      showDone('You\'ve learned all the words!', allWords.length, allWords.length);
-      return;
-    }
-
-    quizQueue = shuffle(unlearned);
+    // Each word appears twice: once EN→RU and once RU→EN
+    const queue = [];
+    allWords.forEach(w => {
+      queue.push({ ...w, direction: 'en-ru' });
+      queue.push({ ...w, direction: 'ru-en' });
+    });
+    quizQueue = shuffle(queue);
     quizIndex = 0;
     quizCorrect = 0;
     quizTotal = 0;
@@ -865,66 +963,72 @@ const uidToUsername = {
   }
 
   function renderQuiz() {
-    const w = quizQueue[quizIndex];
-    document.getElementById('quiz-word').textContent = w.word;
+    clearQuizTimer();
+    const q = quizQueue[quizIndex];
+    const isRuEn = q.direction === 'ru-en';
+
+    // Show question word
+    document.getElementById('quiz-word').textContent = isRuEn ? q.translation : q.word;
     document.getElementById('quiz-score').textContent =
       'Score: ' + quizCorrect + ' / ' + quizTotal + '  |  ' + (quizIndex + 1) + ' of ' + quizQueue.length;
-    speakWord(w.word);
+
+    // Speak in the appropriate language
+    if (isRuEn) {
+      speakRussianWord(q.translation);
+    } else {
+      speakWord(q.word);
+    }
+
     // Build options: 1 correct + 3 distractors
     const distractors = allWords
-      .filter(d => d.word !== w.word)
+      .filter(d => d.word !== q.word)
       .sort(() => Math.random() - 0.5)
       .slice(0, 3);
 
-    const options = shuffle([w, ...distractors]);
+    const options = shuffle([q, ...distractors]);
     const container = document.getElementById('quiz-options');
     container.innerHTML = '';
 
     options.forEach(opt => {
       const btn = document.createElement('button');
       btn.className = 'quiz-option';
-      btn.textContent = opt.translation;
-      btn.onclick = () => quizAnswer(btn, opt.word === w.word, w.word);
+      btn.textContent = isRuEn ? opt.word : opt.translation;
+      btn.onclick = () => quizAnswer(btn, opt.word === q.word, q.word);
       container.appendChild(btn);
     });
-    
+
+    startQuizTimer();
   }
 
   function quizAnswer(btn, isCorrect, correctWord) {
+    clearQuizTimer();
     quizTotal++;
     const buttons = document.querySelectorAll('.quiz-option');
     buttons.forEach(b => b.classList.add('disabled'));
 
+    const q = quizQueue[quizIndex];
+    const isRuEn = q.direction === 'ru-en';
+
     if (isCorrect) {
       btn.classList.add('correct');
       quizCorrect++;
-      // Mark as learned
-      const learned = getProgress(currentFile);
-      if (!learned.includes(correctWord)) {
-        learned.push(correctWord);
-        saveProgress(currentFile, learned);
-        // Update mode title with new learned count
-        document.getElementById('mode-title').textContent =
-          currentFile.replace('.csv', '') + ' (' + learned.length + '/' + allWords.length + ' learned)';
-      }
     } else {
       btn.classList.add('wrong');
-      // Highlight correct answer
+      // Highlight correct answer (direction-aware)
+      const correctWordObj = allWords.find(w => w.word === correctWord);
+      const correctText = isRuEn ? correctWordObj.word : correctWordObj.translation;
       buttons.forEach(b => {
-        const correctTranslation = allWords.find(w => w.word === correctWord).translation;
-        if (b.textContent === correctTranslation) b.classList.add('correct');
+        if (b.textContent === correctText) b.classList.add('correct');
       });
     }
 
     setTimeout(() => {
       quizIndex++;
       if (quizIndex >= quizQueue.length) {
-        const learned = getProgress(currentFile);
-            // Save quiz result to Firebase
         saveQuizResult(currentFile, quizCorrect, quizTotal);
         showDone(
           'Quiz done! Score: ' + quizCorrect + ' / ' + quizTotal,
-          learned.length, allWords.length
+          0, 0
         );
       } else {
         renderQuiz();
@@ -932,10 +1036,212 @@ const uidToUsername = {
     }, 1200);
   }
 
+  // ---- Timer Functions ----
+  function startQuizTimer() {
+    const timerDiv = document.getElementById('quiz-timer');
+    const timerText = document.getElementById('quiz-timer-text');
+
+    if (quizTimerSec === 0) {
+      timerDiv.style.display = 'none';
+      return;
+    }
+
+    timerDiv.style.display = 'block';
+    quizTimeLeft = quizTimerSec;
+    timerText.textContent = quizTimeLeft + 's';
+    timerText.style.color = '#666';
+
+    quizTimerId = setInterval(() => {
+      quizTimeLeft--;
+      timerText.textContent = quizTimeLeft + 's';
+      if (quizTimeLeft <= 2) {
+        timerText.style.color = '#ef233c';
+      }
+      if (quizTimeLeft <= 0) {
+        quizTimeout();
+      }
+    }, 1000);
+  }
+
+  function clearQuizTimer() {
+    if (quizTimerId) {
+      clearInterval(quizTimerId);
+      quizTimerId = null;
+    }
+  }
+
+  function quizTimeout() {
+    clearQuizTimer();
+    quizTotal++;
+
+    const buttons = document.querySelectorAll('.quiz-option');
+    buttons.forEach(b => b.classList.add('disabled'));
+
+    // Highlight correct answer
+    const q = quizQueue[quizIndex];
+    const isRuEn = q.direction === 'ru-en';
+    const correctWordObj = allWords.find(w => w.word === q.word);
+    const correctText = isRuEn ? correctWordObj.word : correctWordObj.translation;
+    buttons.forEach(b => {
+      if (b.textContent === correctText) b.classList.add('correct');
+    });
+
+    document.getElementById('quiz-timer-text').textContent = "Time's up!";
+    document.getElementById('quiz-timer-text').style.color = '#ef233c';
+
+    setTimeout(() => {
+      quizIndex++;
+      if (quizIndex >= quizQueue.length) {
+        saveQuizResult(currentFile, quizCorrect, quizTotal);
+        showDone(
+          'Quiz done! Score: ' + quizCorrect + ' / ' + quizTotal,
+          0, 0
+        );
+      } else {
+        renderQuiz();
+      }
+    }, 1500);
+  }
+
   // ---- Done Screen ----
+  function getEncouragement(username, pct) {
+    const msgs = {
+      Katya: {
+        excellent: [
+          "Катюша, ты просто звезда! 🌟 Почти всё правильно!",
+          "Катя, великолепно! 🌟 Ты настоящий профи!",
+          "Катюша, блеск! 🌟 Так держать!"
+        ],
+        good: [
+          "Катюша, отлично! Ещё чуть-чуть и будет идеально!",
+          "Катя, классный результат! Продолжай в том же духе!",
+          "Катюша, здорово! Ты на верном пути!"
+        ],
+        okay: [
+          "Катюша, неплохо! Попробуй ещё разок, ты справишься!",
+          "Катя, хорошее начало! Ещё немного практики!"
+        ],
+        low: [
+          "Катюша, не расстраивайся! Повтори карточки и попробуй снова!",
+          "Катя, ничего страшного! С каждым разом будет лучше!"
+        ]
+      },
+      Vika: {
+        excellent: [
+          "Викуля, блестящий результат! 🌟 Так держать!",
+          "Вика, ты умничка! 🌟 Почти идеально!",
+          "Викуля, супер! 🌟 Ты молодец!"
+        ],
+        good: [
+          "Викуля, классный результат! Продолжай в том же духе!",
+          "Вика, отлично! Ещё чуть-чуть и будет идеально!",
+          "Викуля, здорово! Продолжай стараться!"
+        ],
+        okay: [
+          "Викуля, неплохое начало! Попрактикуйся ещё!",
+          "Вика, неплохо! Попробуй ещё разочек!"
+        ],
+        low: [
+          "Викуля, ничего страшного! Попрактикуйся и всё получится!",
+          "Вика, не сдавайся! Повтори слова и попробуй снова!"
+        ]
+      },
+      default: {
+        excellent: [
+          "Отличная работа! 🌟 Ты молодец!",
+          "Великолепно! 🌟 Так держать!"
+        ],
+        good: [
+          "Хороший результат! Продолжай!",
+          "Отлично! Ещё немного и будет идеально!"
+        ],
+        okay: [
+          "Неплохо! Попробуй ещё раз!",
+          "Хорошее начало! Ещё немного практики!"
+        ],
+        low: [
+          "Не сдавайся! Попробуй ещё!",
+          "Ничего страшного! Повтори и попробуй снова!"
+        ]
+      }
+    };
+
+    const userMsgs = msgs[username] || msgs.default;
+    const tier = pct >= 90 ? 'excellent' : pct >= 70 ? 'good' : pct >= 50 ? 'okay' : 'low';
+    const pool = userMsgs[tier];
+    return { text: pool[Math.floor(Math.random() * pool.length)], tier: tier };
+  }
+
+  const emojiRows = {
+    excellent: { top: '🎉✨🌟✨🎉', bottom: '🏆🌈⭐🌈🏆' },
+    good:     { top: '✨🎊✨🎊✨', bottom: '💪🌟🚀🌟💪' },
+    okay:     { top: '⭐🌈⭐🌈⭐', bottom: '💫🦄💫' },
+    low:      { top: '💪✨💪✨💪', bottom: '🌈⭐🌈' }
+  };
+
+  function playDoneAnimation() {
+    const emojis = ['🎉','⭐','✨','🌟','🎊','🌈','🚀','🦄','💫','🏆','🥳'];
+    const types = ['confetti-fall', 'firework-burst', 'bubble-float'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const count = 25;
+    const container = document.createElement('div');
+    container.id = 'done-anim-container';
+
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement('span');
+      span.className = 'done-anim-particle';
+      span.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      span.style.fontSize = (1.5 + Math.random() * 1.5) + 'rem';
+      const delay = Math.random() * 1;
+      const duration = 2 + Math.random() * 2;
+
+      if (type === 'confetti-fall') {
+        span.style.left = Math.random() * 100 + 'vw';
+        span.style.top = '-50px';
+        span.style.animation = 'confetti-fall ' + duration + 's ' + delay + 's ease-in forwards';
+      } else if (type === 'firework-burst') {
+        span.style.left = '50vw';
+        span.style.top = '40vh';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 120 + Math.random() * 200;
+        span.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+        span.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+        span.style.animation = 'firework-burst ' + duration + 's ' + delay + 's ease-out forwards';
+      } else {
+        span.style.left = Math.random() * 100 + 'vw';
+        span.style.bottom = '-50px';
+        span.style.animation = 'bubble-float ' + duration + 's ' + delay + 's ease-in-out forwards';
+      }
+
+      container.appendChild(span);
+    }
+
+    document.body.appendChild(container);
+    setTimeout(() => { container.remove(); }, 5000);
+  }
+
   function showDone(message, learnedCount, totalCount) {
-    document.getElementById('done-message').textContent =
-      message + '\n\nTotal progress: ' + learnedCount + ' / ' + totalCount + ' words learned.';
+    let text = message;
+    if (totalCount > 0) {
+      text += '\n\nTotal progress: ' + learnedCount + ' / ' + totalCount + ' words learned.';
+    }
+    document.getElementById('done-message').textContent = text;
+
+    const encourageEl = document.getElementById('done-encouragement');
+    if (lastMode === 'quiz' && quizTotal > 0) {
+      const pct = Math.round((quizCorrect / quizTotal) * 100);
+      const result = getEncouragement(currentUsername, pct);
+      const row = emojiRows[result.tier];
+      document.getElementById('encourage-emojis-top').textContent = row.top;
+      document.getElementById('encourage-text').textContent = result.text;
+      document.getElementById('encourage-emojis-bottom').textContent = row.bottom;
+      encourageEl.style.display = 'block';
+      speakRussianWord(result.text.replace(/[🌟✨💪🎉🎊🌈🚀🦄💫🏆🥳⭐]/g, ''));
+      playDoneAnimation();
+    } else {
+      encourageEl.style.display = 'none';
+    }
+
     showScreen('screen-done');
   }
 
