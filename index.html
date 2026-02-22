@@ -699,6 +699,10 @@ const uidToUsername = {
   let quizTimerId = null;
   let quizTimeLeft = 0;
 
+  // Per-card timing
+  let quizCardStartTime = null;
+  let quizElapsedTimes = [];
+
   function setQuizTimer(sec) {
     quizTimerSec = sec;
     document.querySelectorAll('#timer-toggle .setting-toggle').forEach(b => {
@@ -958,6 +962,8 @@ const uidToUsername = {
     quizIndex = 0;
     quizCorrect = 0;
     quizTotal = 0;
+    quizCardStartTime = null;
+    quizElapsedTimes = [];
     showScreen('screen-quiz');
     renderQuiz();
   }
@@ -997,10 +1003,15 @@ const uidToUsername = {
       container.appendChild(btn);
     });
 
+    quizCardStartTime = Date.now();
     startQuizTimer();
   }
 
   function quizAnswer(btn, isCorrect, correctWord) {
+    if (quizCardStartTime !== null) {
+      quizElapsedTimes.push((Date.now() - quizCardStartTime) / 1000);
+      quizCardStartTime = null;
+    }
     clearQuizTimer();
     quizTotal++;
     const buttons = document.querySelectorAll('.quiz-option');
@@ -1025,7 +1036,8 @@ const uidToUsername = {
     setTimeout(() => {
       quizIndex++;
       if (quizIndex >= quizQueue.length) {
-        saveQuizResult(currentFile, quizCorrect, quizTotal);
+        const medianSec = computeMedian(quizElapsedTimes);
+        saveQuizResult(currentFile, quizCorrect, quizTotal, medianSec);
         showDone(
           'Quiz done! Score: ' + quizCorrect + ' / ' + quizTotal,
           0, 0
@@ -1070,7 +1082,29 @@ const uidToUsername = {
     }
   }
 
+  function computeMedian(arr) {
+    if (!arr.length) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  function getSpeedMultiplier(userMedian, maxMedian) {
+    if (!maxMedian) return 1.0;
+    const ratio = userMedian / maxMedian;
+    if (ratio < 0.25) return 1.00;
+    if (ratio < 0.50) return 0.85;
+    if (ratio < 0.75) return 0.70;
+    return 0.60;
+  }
+
   function quizTimeout() {
+    if (quizCardStartTime !== null) {
+      quizElapsedTimes.push((Date.now() - quizCardStartTime) / 1000);
+      quizCardStartTime = null;
+    }
     clearQuizTimer();
     quizTotal++;
 
@@ -1092,7 +1126,8 @@ const uidToUsername = {
     setTimeout(() => {
       quizIndex++;
       if (quizIndex >= quizQueue.length) {
-        saveQuizResult(currentFile, quizCorrect, quizTotal);
+        const medianSec = computeMedian(quizElapsedTimes);
+        saveQuizResult(currentFile, quizCorrect, quizTotal, medianSec);
         showDone(
           'Quiz done! Score: ' + quizCorrect + ' / ' + quizTotal,
           0, 0
@@ -1106,46 +1141,108 @@ const uidToUsername = {
   // ---- Done Screen ----
   function getEncouragement(username, pct) {
     const msgs = {
-      user2: {
-        excellent: [
-          "Катюша, ты просто звезда! 🌟 Почти всё правильно!",
-          "Катя, великолепно! 🌟 Ты настоящий профи!",
-          "Катюша, блеск! 🌟 Так держать!"
-        ],
-        good: [
-          "Катюша, отлично! Ещё чуть-чуть и будет идеально!",
-          "Катя, классный результат! Продолжай в том же духе!",
-          "Катюша, здорово! Ты на верном пути!"
-        ],
-        okay: [
-          "Катюша, неплохо! Попробуй ещё разок, ты справишься!",
-          "Катя, хорошее начало! Ещё немного практики!"
-        ],
-        low: [
-          "Катюша, не расстраивайся! Повтори карточки и попробуй снова!",
-          "Катя, ничего страшного! С каждым разом будет лучше!"
-        ]
-      },
-      user3: {
-        excellent: [
-          "Викуля, блестящий результат! 🌟 Так держать!",
-          "Вика, ты умничка! 🌟 Почти идеально!",
-          "Викуля, супер! 🌟 Ты молодец!"
-        ],
-        good: [
-          "Викуля, классный результат! Продолжай в том же духе!",
-          "Вика, отлично! Ещё чуть-чуть и будет идеально!",
-          "Викуля, здорово! Продолжай стараться!"
-        ],
-        okay: [
-          "Викуля, неплохое начало! Попрактикуйся ещё!",
-          "Вика, неплохо! Попробуй ещё разочек!"
-        ],
-        low: [
-          "Викуля, ничего страшного! Попрактикуйся и всё получится!",
-          "Вика, не сдавайся! Повтори слова и попробуй снова!"
-        ]
-      },
+  user2: {
+    excellent: [
+      "Катюша, ты просто звезда! 🌟 Почти всё правильно!",
+      "Катенька, великолепно! 🌟 Ты настоящий профи!",
+      "Катюшка, блеск! 🌟 Так держать!",
+      "Катюнчик, потрясающе! Ты меня восхищаешь! 🌟",
+      "Катенька, всё сделано просто идеально! 🌟",
+      "Катюшка, какой выдающийся результат сегодня! 🌟",
+      "Катюша, ты сегодня превзошла саму себя! 🌟",
+      "Катюнчик, это прям уровень олимпиады! 🌟",
+      "Катюша, невероятно сильная работа, браво! 🌟",
+      "Катенька, ты показала максимум мастерства! 🌟"
+    ],
+    good: [
+      "Катюшка, отлично! Ещё чуть-чуть и будет идеально!",
+      "Катя, классный результат! Продолжай в том же духе!",
+      "Катюша, здорово! Ты на верном пути!",
+      "Катенька, очень хороший прогресс, так держать!",
+      "Катюшка, видно, как ты старалась сегодня!",
+      "Катюша, ещё немного — и будет шедевр!",
+      "Катюнчик, ты уверенно движешься к идеалу!",
+      "Катенька, очень достойный уровень, браво!",
+      "Катюша, результат радует, не останавливайся!",
+      "Катюшка, всё круто, продолжай в том же духе!"
+    ],
+    okay: [
+      "Катюшка, неплохо! Попробуй ещё разок, ты справишься!",
+      "Катя, хорошее начало! Ещё немного практики!",
+      "Катенька, база есть, давай усилим результат!",
+      "Катюша, уже неплохо, чуть-чуть доработать!",
+      "Катюнчик, направление верное, нужно больше тренировки!",
+      "Катюшка, неплохо, давай попробуем ещё вариант!",
+      "Катенька, есть с чего стартовать, продолжай!",
+      "Катюша, вполне рабочий уровень для начала!",
+      "Катюшка, уже видно прогресс, не сдавайся!",
+      "Катенька, ты на старте пути, всё впереди!"
+    ],
+    low: [
+      "Катерина, не расстраивайся! Повтори карточки и попробуй снова!",
+      "Катя, ничего страшного! С каждым разом будет лучше!",
+      "Катенька, ошибки — это ступеньки к успеху!",
+      "Катюшка, всё нормально, давай попробуем ещё раз!",
+      "Катюнчик, главное — не бросать, ты справишься!",
+      "Катюша, каждый промах приближает к попаданию!",
+      "Катенька, маленький шаг назад — и большой вперёд!",
+      "Катюшка, сейчас чуть сложнее, но это временно!",
+      "Катюша, немного практики — и результат взлетит!",
+      "Катюнчик, не сдавайся, я верю в тебя!"
+    ]
+  },
+
+user3: {
+  excellent: [
+    "Викуля, блестящий результат! 🌟 Так держать!",
+    "Викуся, ты умничка! 🌟 Почти идеально!",
+    "Вика, супер! 🌟 Ты молодец!",
+    "Викуля, безупречно! Ты сияешь сегодня! 🌟",
+    "Викуся, просто невероятный уровень, браво! 🌟",
+    "Вика, ты сегодня как настоящая звезда! 🌟",
+    "Викуся, сказал бы экзаменатор: «отлично»! 🌟",
+    "Викуля, шикарная работа, горжусь тобой! 🌟",
+    "Вика, всё сделано на высшем уровне! 🌟",
+    "Викуся, результат — выше всяких ожиданий! 🌟"
+  ],
+  good: [
+    "Викуля, классный результат! Продолжай в том же духе!",
+    "Вика, отлично! Ещё чуть-чуть и будет идеально!",
+    "Викуся, здорово! Продолжай стараться!",
+    "Викуля, очень хороший уровень, молодчинка!",
+    "Вика, видно, как ты старалась, умница!",
+    "Викуся, ещё немного практики — и будет супер!",
+    "Вика, результат радует, продолжай в том же темпе!",
+    "Викуля, крепкая работа, можно идти дальше!",
+    "Викуся, хороший прогресс, не останавливайся!",
+    "Вика, ты уверенно движешься вверх!"
+  ],
+  okay: [
+    "Викуля, неплохое начало! Попрактикуйся ещё!",
+    "Вика, неплохо! Попробуй ещё разочек!",
+    "Викуся, основа есть, давай усилим результат!",
+    "Викуля, уже лучше, чем было вчера!",
+    "Вика, всё идёт по плану, ещё тренировки!",
+    "Викуся, есть над чем поработать, но ты справишься!",
+    "Викуля, путь только начинается, продолжай!",
+    "Вика, нормальный старт, дальше будет легче!",
+    "Викуся, прогресс заметен, не останавливайся!",
+    "Викуля, шаг за шагом ты придёшь к идеалу!"
+  ],
+  low: [
+    "Викуся, ничего страшного! Попрактикуйся и всё получится!",
+    "Виктория Сергеевна, не сдавайся! Повтори слова и попробуй снова!",
+    "Викуля, ошибки — это часть обучения, всё нормально!",
+    "Викуся, сейчас непросто, но ты сильная!",
+    "Вика, не переживай, мы просто попробуем ещё раз!",
+    "Викуля, каждый промах — это опыт, не бойся!",
+    "Викуся, делай маленькие шаги, и всё выйдет!",
+    "Вика, даже так — уже начало пути!",
+    "Викуля, немного терпения, и результат подтянется!",
+    "Викуся, я рядом, давай попробуем ещё раз!"
+  ]
+},
+
       default: {
         excellent: [
           "Отличная работа! 🌟 Ты молодец!",
@@ -1252,7 +1349,7 @@ const uidToUsername = {
 
   // ---- Firebase Save Functions ----
 
-async function saveQuizResult(quizId, score, total) {
+async function saveQuizResult(quizId, score, total, medianSeconds) {
   const user = auth.currentUser;
   if (!user) return;
 
@@ -1265,6 +1362,7 @@ async function saveQuizResult(quizId, score, total) {
         quizId: quizId,
         score: score,
         total: total,
+        medianSeconds: Math.round(medianSeconds * 10) / 10,
         createdAt: new Date().toISOString()
       });
     console.log("Quiz result saved for", currentUsername);
@@ -1289,6 +1387,7 @@ async function getAllUsersStats() {
     const files = await filesRes.json();
     const totalAvailable = files.length;
 
+    // Pass 1: collect raw stats and per-user median
     const stats = [];
 
     for (const userId of userIds) {
@@ -1321,20 +1420,38 @@ async function getAllUsersStats() {
       const quizAverage = sumTotal > 0
         ? Math.round((sumScore / sumTotal) * 100)
         : 0;
-      const combinedScore = totalAvailable > 0
-        ? Math.round(quizAverage * (completedCount / totalAvailable))
-        : 0;
+
+      // Collect medianSeconds values from latest results (filter null/undefined)
+      const medianValues = latestResults
+        .map(r => r.medianSeconds)
+        .filter(v => v != null && !isNaN(v));
+      const userMedian = medianValues.length > 0
+        ? Math.round(computeMedian(medianValues) * 10) / 10
+        : null;
 
       stats.push({
         userId,
         quizAverage,
         completedCount,
         totalAvailable,
-        combinedScore
+        userMedian
       });
     }
 
-    return stats;
+    // Between passes: find slowest user's median
+    const maxMedian = Math.max(...stats.map(s => s.userMedian).filter(v => v != null), 0);
+
+    // Pass 2: apply speed multiplier and compute final scores
+    return stats.map(s => {
+      const multiplier = s.userMedian != null
+        ? getSpeedMultiplier(s.userMedian, maxMedian)
+        : 0.75;
+      const speedWeightedAvg = Math.round(s.quizAverage * multiplier);
+      const combinedScore = s.totalAvailable > 0
+        ? Math.round(speedWeightedAvg * (s.completedCount / s.totalAvailable))
+        : 0;
+      return { ...s, speedWeightedAvg, combinedScore };
+    });
   } catch (e) {
     console.error("Error fetching stats:", e);
     return [];
@@ -1342,7 +1459,7 @@ async function getAllUsersStats() {
 }
 
 
-async function getMyStats() {
+async function getMyStats(maxMedian = 0) {
   const user = auth.currentUser;
   if (!user) return null;
 
@@ -1379,12 +1496,26 @@ async function getMyStats() {
     const quizAverage = sumTotal > 0
       ? Math.round((sumScore / sumTotal) * 100)
       : 0;
+
+    const medianValues = latestResults
+      .map(r => r.medianSeconds)
+      .filter(v => v != null && !isNaN(v));
+    const userMedian = medianValues.length > 0
+      ? Math.round(computeMedian(medianValues) * 10) / 10
+      : null;
+
+    const multiplier = userMedian != null
+      ? getSpeedMultiplier(userMedian, maxMedian)
+      : 0.75;
+    const speedWeightedAvg = Math.round(quizAverage * multiplier);
     const combinedScore = totalAvailable > 0
-      ? Math.round(quizAverage * (completedCount / totalAvailable))
+      ? Math.round(speedWeightedAvg * (completedCount / totalAvailable))
       : 0;
 
     return {
       quizAverage,
+      userMedian,
+      speedWeightedAvg,
       completedCount,
       totalAvailable,
       combinedScore
@@ -1399,15 +1530,22 @@ async function getMyStats() {
 
 async function showStats() {
   showScreen('screen-stats');
-  
+
+  // Fetch all stats first to get maxMedian for consistent scoring
+  const allStats = await getAllUsersStats();
+  const maxMedian = Math.max(...allStats.map(s => s.userMedian).filter(v => v != null), 0);
+
   // Show my stats
-  const myStats = await getMyStats();
+  const myStats = await getMyStats(maxMedian);
   const myStatsDiv = document.getElementById('my-stats-content');
-  
+
   if (myStats && myStats.completedCount > 0) {
+    const timeStr = myStats.userMedian != null ? myStats.userMedian.toFixed(1) + 's per card' : '—';
     myStatsDiv.innerHTML = `
       <p><strong>Quizzes completed:</strong> ${myStats.completedCount} / ${myStats.totalAvailable}</p>
       <p><strong>Quiz average:</strong> ${myStats.quizAverage}%</p>
+      <p><strong>Median answer time:</strong> ${timeStr}</p>
+      <p><strong>Speed-weighted score:</strong> ${myStats.speedWeightedAvg}%</p>
       <p><strong>Rating:</strong> ${myStats.combinedScore}%</p>
     `;
   } else {
@@ -1415,7 +1553,6 @@ async function showStats() {
   }
 
   // Show leaderboard
-  const allStats = await getAllUsersStats();
   const leaderboardDiv = document.getElementById('leaderboard-content');
 
   if (allStats.length === 0) {
@@ -1439,6 +1576,7 @@ async function showStats() {
   html += '<th style="text-align:left; padding:8px">User</th>';
   html += '<th style="text-align:center; padding:8px">Done</th>';
   html += '<th style="text-align:center; padding:8px">Avg %</th>';
+  html += '<th style="text-align:center; padding:8px">⏱ Time</th>';
   html += '<th style="text-align:center; padding:8px">Rating</th>';
   html += '</tr>';
   
@@ -1455,6 +1593,7 @@ async function showStats() {
     html += `<td style="padding:12px 8px; font-weight:${isMe ? '600' : '400'}; font-size:.9rem">${displayName}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.completedCount}/${stat.totalAvailable}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.quizAverage}%</td>`;
+    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; color:#666">${stat.userMedian != null ? stat.userMedian.toFixed(1) + 's' : '—'}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; font-weight:600; color:#4361ee">${stat.combinedScore}%</td>`;
     html += '</tr>';
   });
