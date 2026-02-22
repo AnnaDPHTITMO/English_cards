@@ -1642,7 +1642,7 @@ async function showStats() {
     html += `<td style="padding:12px 8px; font-weight:${isMe ? '600' : '400'}; font-size:.9rem">${displayName}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.completedCount}/${stat.totalAvailable}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.quizAverage}%</td>`;
-    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; color:var(--text-muted)">${stat.userMedian != null ? stat.Math.ceil(userMedian) + 's' : '—'}</td>`;
+    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; color:var(--text-muted)">${stat.userMedian != null ? Math.ceil(stat.userMedian) + 's' : '—'}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; font-weight:600; color:#4361ee">${stat.combinedScore}%</td>`;
     html += '</tr>';
   });
