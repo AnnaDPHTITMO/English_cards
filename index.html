@@ -422,6 +422,18 @@
       75% { transform: translateY(-82vh) translateX(10px); }
       100% { transform: translateY(-110vh) translateX(0); opacity: 0; }
     }
+    @keyframes twirl-fall {
+      0%   { transform: translateY(-50px) translateX(0)    rotate(0deg);   opacity: 1; }
+      25%  { transform: translateY(22vh)  translateX(70px) rotate(200deg); }
+      50%  { transform: translateY(50vh)  translateX(-70px) rotate(400deg); opacity: .8; }
+      75%  { transform: translateY(78vh)  translateX(50px) rotate(600deg); }
+      100% { transform: translateY(110vh) translateX(0)    rotate(720deg); opacity: 0; }
+    }
+    @keyframes meteor {
+      0%   { transform: translate(0, 0)       rotate(35deg) scale(1);   opacity: 1; }
+      80%  { opacity: .9; }
+      100% { transform: translate(180px, 100vh) rotate(35deg) scale(.5); opacity: 0; }
+    }
     .done-anim-particle {
       position: fixed;
       pointer-events: none;
@@ -1499,45 +1511,75 @@ user3: {
     low:      { top: '💪✨💪✨💪', bottom: '🌈⭐🌈' }
   };
 
-  function playDoneAnimation() {
+  function playDoneAnimation(tier) {
+    const cfg = {
+      excellent: { confetti: 14, fireworks: 18, bubbles: 10, twirl: 10, meteor: 8 },
+      good:      { confetti: 10, fireworks: 14, bubbles:  8, twirl:  6, meteor: 0 },
+      okay:      { confetti:  8, fireworks:  0, bubbles:  6, twirl:  0, meteor: 0 },
+      low:       { confetti:  0, fireworks:  0, bubbles:  5, twirl:  0, meteor: 0 },
+    };
+    const c = cfg[tier] || cfg.okay;
+
     const emojis = ['🎉','⭐','✨','🌟','🎊','🌈','🚀','🦄','💫','🏆','🥳'];
-    const types = ['confetti-fall', 'firework-burst', 'bubble-float'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const count = 25;
     const container = document.createElement('div');
     container.id = 'done-anim-container';
 
-    for (let i = 0; i < count; i++) {
+    function addParticle(setup) {
       const span = document.createElement('span');
       span.className = 'done-anim-particle';
       span.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-      span.style.fontSize = (1.5 + Math.random() * 1.5) + 'rem';
-      const delay = Math.random() * 1;
-      const duration = 2 + Math.random() * 2;
-
-      if (type === 'confetti-fall') {
-        span.style.left = Math.random() * 100 + 'vw';
-        span.style.top = '-50px';
-        span.style.animation = 'confetti-fall ' + duration + 's ' + delay + 's ease-in forwards';
-      } else if (type === 'firework-burst') {
-        span.style.left = '50vw';
-        span.style.top = '40vh';
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 120 + Math.random() * 200;
-        span.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
-        span.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        span.style.animation = 'firework-burst ' + duration + 's ' + delay + 's ease-out forwards';
-      } else {
-        span.style.left = Math.random() * 100 + 'vw';
-        span.style.bottom = '-50px';
-        span.style.animation = 'bubble-float ' + duration + 's ' + delay + 's ease-in-out forwards';
-      }
-
+      span.style.fontSize = (1.2 + Math.random() * 1.8) + 'rem';
+      setup(span);
       container.appendChild(span);
     }
 
+    // Confetti raining from top
+    for (let i = 0; i < c.confetti; i++) addParticle(s => {
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.top = '-50px';
+      const d = 2.5 + Math.random() * 2, dl = Math.random() * 2;
+      s.style.animation = `confetti-fall ${d}s ${dl}s ease-in forwards`;
+    });
+
+    // Firework bursts from 3 different centres
+    const cx = ['30vw', '50vw', '70vw'];
+    for (let i = 0; i < c.fireworks; i++) addParticle(s => {
+      const fw = cx[Math.floor(Math.random() * cx.length)];
+      s.style.left = fw;
+      s.style.top = (25 + Math.random() * 25) + 'vh';
+      const angle = Math.random() * Math.PI * 2, dist = 80 + Math.random() * 180;
+      s.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+      s.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+      const d = 1.5 + Math.random() * 1.5, dl = Math.random() * 1.5;
+      s.style.animation = `firework-burst ${d}s ${dl}s ease-out forwards`;
+    });
+
+    // Bubbles rising from bottom
+    for (let i = 0; i < c.bubbles; i++) addParticle(s => {
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.bottom = '-50px';
+      const d = 3 + Math.random() * 2, dl = Math.random() * 2.5;
+      s.style.animation = `bubble-float ${d}s ${dl}s ease-in-out forwards`;
+    });
+
+    // Twirling zigzag fall
+    for (let i = 0; i < c.twirl; i++) addParticle(s => {
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.top = '-50px';
+      const d = 3.5 + Math.random() * 2, dl = 0.5 + Math.random() * 2;
+      s.style.animation = `twirl-fall ${d}s ${dl}s ease-in forwards`;
+    });
+
+    // Meteor shower (diagonal streaks)
+    for (let i = 0; i < c.meteor; i++) addParticle(s => {
+      s.style.left = Math.random() * 80 + 'vw';
+      s.style.top = '-50px';
+      const d = 1.2 + Math.random() * 1, dl = Math.random() * 2.5;
+      s.style.animation = `meteor ${d}s ${dl}s linear forwards`;
+    });
+
     document.body.appendChild(container);
-    setTimeout(() => { container.remove(); }, 5000);
+    setTimeout(() => { container.remove(); }, 7000);
   }
 
   function showDone(message, learnedCount, totalCount) {
@@ -1557,7 +1599,7 @@ user3: {
       document.getElementById('encourage-emojis-bottom').textContent = row.bottom;
       encourageEl.style.display = 'block';
       speakRussianWord(result.text.replace(/[🌟✨💪🎉🎊🌈🚀🦄💫🏆🥳⭐]/g, ''));
-      playDoneAnimation();
+      playDoneAnimation(result.tier);
     } else {
       encourageEl.style.display = 'none';
     }
