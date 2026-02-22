@@ -1132,6 +1132,14 @@ const uidToUsername = {
   }
 
   function startGrammarQuiz(file, cards) {
+    // Prime the Web Speech API while still in user-gesture context so the
+    // encouragement message can be spoken at the end (browsers block speech
+    // synthesis on the first call unless it originates from a user gesture).
+    if (window.speechSynthesis) {
+      const warmup = new SpeechSynthesisUtterance(' ');
+      warmup.volume = 0;
+      speechSynthesis.speak(warmup);
+    }
     grammarMode = true;
     lastMode = 'grammar';
     currentFile = file;
