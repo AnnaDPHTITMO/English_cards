@@ -907,12 +907,20 @@ const uidToUsername = {
       });
     }
 
-    for (const file of files) {
-      const csvRes = await fetch('words/' + file);
-      const csvText = await csvRes.text();
-      const words = parseCSV(csvText);
-      const quizCount = quizCounts[file] || 0;
+    // Fetch all CSVs in parallel, then sort by quiz count ascending
+    const csvResults = await Promise.all(
+      files.map(file => fetch('words/' + file).then(r => r.text()))
+    );
 
+    const entries = files.map((file, i) => ({
+      file,
+      words: parseCSV(csvResults[i]),
+      quizCount: quizCounts[file] || 0
+    }));
+
+    entries.sort((a, b) => a.quizCount - b.quizCount);
+
+    for (const { file, words, quizCount } of entries) {
       const li = document.createElement('li');
       li.innerHTML = `
         <div>
@@ -1436,14 +1444,13 @@ async function getAllUsersStats() {
     const files = await filesRes.json();
     const totalAvailable = files.length;
 
-    // Pass 1: collect raw stats and per-user median
-    const stats = [];
+    // Pass 1: fetch all users in parallel, collect raw stats and per-user median
+    const snapshots = await Promise.all(
+      userIds.map(uid => db.collection("users").doc(uid).collection("results").get())
+    );
 
-    for (const userId of userIds) {
-      const resultsSnapshot = await db.collection("users")
-        .doc(userId)
-        .collection("results")
-        .get();
+    const stats = snapshots.map((resultsSnapshot, i) => {
+      const userId = userIds[i];
 
       // Group by quizId, keep only the latest result per quiz
       const latestByQuiz = {};
@@ -1478,14 +1485,8 @@ async function getAllUsersStats() {
         ? Math.round(computeMedian(medianValues) * 10) / 10
         : null;
 
-      stats.push({
-        userId,
-        quizAverage,
-        completedCount,
-        totalAvailable,
-        userMedian
-      });
-    }
+      return { userId, quizAverage, completedCount, totalAvailable, userMedian };
+    });
 
     // Between passes: find slowest user's median
     const maxMedian = Math.max(...stats.map(s => s.userMedian).filter(v => v != null), 0);
@@ -1580,16 +1581,16 @@ async function getMyStats(maxMedian = 0) {
 async function showStats() {
   showScreen('screen-stats');
 
-  // Fetch all stats first to get maxMedian for consistent scoring
+  // Fetch all stats (all users in parallel) to get maxMedian for consistent scoring
   const allStats = await getAllUsersStats();
   const maxMedian = Math.max(...allStats.map(s => s.userMedian).filter(v => v != null), 0);
 
-  // Show my stats
-  const myStats = await getMyStats(maxMedian);
+  // Reuse current user's data from allStats — no extra Firebase read needed
+  const myStats = allStats.find(s => s.userId === auth.currentUser.uid) || null;
   const myStatsDiv = document.getElementById('my-stats-content');
 
   if (myStats && myStats.completedCount > 0) {
-    const timeStr = myStats.userMedian != null ? myStats.userMedian.toFixed(1) + 's per card' : '—';
+    const timeStr = myStats.userMedian != null ? Math.ceil(myStats.userMedian) + 's per card' : '—';
     myStatsDiv.innerHTML = `
       <p><strong>Quizzes completed:</strong> ${myStats.completedCount} / ${myStats.totalAvailable}</p>
       <p><strong>Quiz average:</strong> ${myStats.quizAverage}%</p>
@@ -1641,7 +1642,7 @@ async function showStats() {
     html += `<td style="padding:12px 8px; font-weight:${isMe ? '600' : '400'}; font-size:.9rem">${displayName}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.completedCount}/${stat.totalAvailable}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem">${stat.quizAverage}%</td>`;
-    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; color:var(--text-muted)">${stat.userMedian != null ? stat.userMedian.toFixed(1) + 's' : '—'}</td>`;
+    html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; color:var(--text-muted)">${stat.userMedian != null ? stat.Math.ceil(userMedian) + 's' : '—'}</td>`;
     html += `<td style="padding:12px 8px; text-align:center; font-size:.9rem; font-weight:600; color:#4361ee">${stat.combinedScore}%</td>`;
     html += '</tr>';
   });
