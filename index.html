@@ -832,9 +832,10 @@ const uidToUsername = {
 
   // Word count per quiz (vocab only); 0 = all words
   let quizWordCount = 0;
-  let audioFiles = null;      // null = not fetched yet
-  let sharedAudioCtx = null;  // single AudioContext, unlocked during user gesture
-  let audioBufferCache = {};  // decoded AudioBuffers keyed by filename
+  let audioFiles = null;        // null = not fetched yet
+  let sharedAudioCtx = null;    // single AudioContext, unlocked during user gesture
+  let audioBufferCache = {};    // decoded AudioBuffers keyed by filename
+  let unlockedAudio = new Audio(); // pre-unlocked HTMLAudio element for iOS fallback
 
   function setQuizTimer(sec) {
     quizTimerSec = sec;
@@ -941,8 +942,11 @@ const uidToUsername = {
       .then(list => { audioFiles = list; return list; })
       .catch(() => { audioFiles = []; return []; });
   }
-  // Call during a user gesture to create/resume the AudioContext (required on iOS)
+  // Call during a user gesture to unlock audio on iOS
   function ensureAudioCtx() {
+    // Unlock the pre-created HTMLAudio element (iOS Safari requires play() in gesture context)
+    unlockedAudio.play().catch(() => {});
+    // Also unlock Web Audio API context
     if (!window.AudioContext && !window.webkitAudioContext) return;
     if (!sharedAudioCtx) {
       try { sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
@@ -956,6 +960,8 @@ const uidToUsername = {
     const ctx = sharedAudioCtx;
     if (ctx) {
       try {
+        // Resume in case iOS suspended the context since the last gesture
+        if (ctx.state !== 'running') await ctx.resume();
         if (!audioBufferCache[f]) {
           const resp = await fetch('audio/' + f);
           audioBufferCache[f] = await ctx.decodeAudioData(await resp.arrayBuffer());
@@ -970,8 +976,10 @@ const uidToUsername = {
         return;
       } catch(e) {}
     }
-    // Fallback: plain HTMLAudioElement (desktop browsers without Web Audio)
-    new Audio('audio/' + f).play().catch(() => {});
+    // iOS fallback: use the pre-unlocked HTMLAudio element (new Audio() is blocked on iOS)
+    unlockedAudio.src = 'audio/' + f;
+    unlockedAudio.currentTime = 0;
+    unlockedAudio.play().catch(() => {});
   }
 
   function speakRussianWord(text, onEnd) {
