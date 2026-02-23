@@ -832,7 +832,9 @@ const uidToUsername = {
 
   // Word count per quiz (vocab only); 0 = all words
   let quizWordCount = 0;
-  let audioFiles = null; // null = not fetched yet
+  let audioFiles = null;      // null = not fetched yet
+  let sharedAudioCtx = null;  // single AudioContext, unlocked during user gesture
+  let audioBufferCache = {};  // decoded AudioBuffers keyed by filename
 
   function setQuizTimer(sec) {
     quizTimerSec = sec;
@@ -939,21 +941,37 @@ const uidToUsername = {
       .then(list => { audioFiles = list; return list; })
       .catch(() => { audioFiles = []; return []; });
   }
-  function playRandomAudio() {
-    loadAudioFiles().then(files => {
-      if (!files.length) return;
-      const f = files[Math.floor(Math.random() * files.length)];
-      const audio = new Audio('audio/' + f);
+  // Call during a user gesture to create/resume the AudioContext (required on iOS)
+  function ensureAudioCtx() {
+    if (!window.AudioContext && !window.webkitAudioContext) return;
+    if (!sharedAudioCtx) {
+      try { sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+  }
+  async function playRandomAudio() {
+    const files = await loadAudioFiles();
+    if (!files.length) return;
+    const f = files[Math.floor(Math.random() * files.length)];
+    const ctx = sharedAudioCtx;
+    if (ctx) {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const source = ctx.createMediaElementSource(audio);
+        if (!audioBufferCache[f]) {
+          const resp = await fetch('audio/' + f);
+          audioBufferCache[f] = await ctx.decodeAudioData(await resp.arrayBuffer());
+        }
+        const source = ctx.createBufferSource();
         const gain = ctx.createGain();
         gain.gain.value = 2.0;
+        source.buffer = audioBufferCache[f];
         source.connect(gain);
         gain.connect(ctx.destination);
-      } catch (e) { /* Web Audio not supported — plays at normal volume */ }
-      audio.play().catch(() => {});
-    });
+        source.start();
+        return;
+      } catch(e) {}
+    }
+    // Fallback: plain HTMLAudioElement (desktop browsers without Web Audio)
+    new Audio('audio/' + f).play().catch(() => {});
   }
 
   function speakRussianWord(text, onEnd) {
@@ -963,7 +981,13 @@ const uidToUsername = {
     utterance.lang = 'ru-RU';
     utterance.rate = 0.9;
     utterance.pitch = 1;
-    if (onEnd) utterance.onend = onEnd;
+    if (onEnd) {
+      let fired = false;
+      const fireOnce = () => { if (!fired) { fired = true; onEnd(); } };
+      utterance.onend = fireOnce;
+      // iOS Safari fallback: onend is unreliable, fire after estimated speech duration
+      setTimeout(fireOnce, Math.max(3000, text.length * 110));
+    }
     speechSynthesis.speak(utterance);
   }
 
@@ -1308,6 +1332,7 @@ const uidToUsername = {
   }
 
   function quizAnswer(btn, isCorrect, correctWord) {
+    ensureAudioCtx(); // unlock AudioContext on iOS during user gesture
     if (quizCardStartTime !== null) {
       quizElapsedTimes.push((Date.now() - quizCardStartTime) / 1000);
       quizCardStartTime = null;
@@ -1947,8 +1972,7 @@ function buildLeaderboard(allStats, currentUserId, accentColor) {
     const isMe = stat.userId === currentUserId;
     const medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : '';
     const name = (uidToUsername[stat.userId] || stat.userId.substring(0, 8)) + (isMe ? ' (Ты)' : '');
-    const delay = (i * 0.08).toFixed(2);
-    html += `<tr class="${isMe ? 'lb-row lb-row-me' : 'lb-row'}" style="animation:lb-slide-in 0.35s ease ${delay}s both">`;
+    html += `<tr class="${isMe ? 'lb-row lb-row-me' : 'lb-row'}">`;
     html += `<td style="padding:12px 8px;font-size:.9rem">${medal}${i + 1}</td>`;
     html += `<td style="padding:12px 8px;font-weight:${isMe?'600':'400'};font-size:.9rem">${name}</td>`;
     html += `<td style="padding:12px 8px;text-align:center;font-size:.9rem">${stat.completedCount}/${stat.totalAvailable}</td>`;
