@@ -962,7 +962,7 @@ const uidToUsername = {
         }
         const source = ctx.createBufferSource();
         const gain = ctx.createGain();
-        gain.gain.value = 2.0;
+        gain.gain.value = 4.0;
         source.buffer = audioBufferCache[f];
         source.connect(gain);
         gain.connect(ctx.destination);
