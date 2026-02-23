@@ -536,6 +536,15 @@
         <button class="setting-toggle active" data-timer="0" onclick="setQuizTimer(0)">Off</button>
       </div>
     </div>
+    <div class="stat-card" style="width:100%; margin-top:10px; box-shadow:0 1px 3px rgba(0,0,0,.08);">
+      <label class="text-muted" style="font-size:.9rem; display:block; margin-bottom:6px;">Words per quiz</label>
+      <div id="wordcount-toggle" style="display:flex; gap:8px;">
+        <button class="setting-toggle" data-count="10" onclick="setQuizWordCount(10)">10</button>
+        <button class="setting-toggle" data-count="20" onclick="setQuizWordCount(20)">20</button>
+        <button class="setting-toggle" data-count="30" onclick="setQuizWordCount(30)">30</button>
+        <button class="setting-toggle active" data-count="0" onclick="setQuizWordCount(0)">All</button>
+      </div>
+    </div>
     <div class="mode-btn-group">
       <button class="mode-btn flip" onclick="startFlip()">Flip Cards</button>
       <button class="mode-btn quiz" onclick="startQuiz()">Quiz</button>
@@ -802,10 +811,20 @@ const uidToUsername = {
   let quizBackScreen = 'screen-mode';
   let doneHomeScreen = 'screen-files';
 
+  // Word count per quiz (vocab only); 0 = all words
+  let quizWordCount = 0;
+
   function setQuizTimer(sec) {
     quizTimerSec = sec;
     document.querySelectorAll('#timer-toggle .setting-toggle, #grammar-timer-toggle .setting-toggle').forEach(b => {
       b.classList.toggle('active', Number(b.dataset.timer) === sec);
+    });
+  }
+
+  function setQuizWordCount(n) {
+    quizWordCount = n;
+    document.querySelectorAll('#wordcount-toggle .setting-toggle').forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.count) === n);
     });
   }
 
@@ -955,6 +974,14 @@ const uidToUsername = {
     const learnedCount = learned.filter(w => words.some(ww => ww.word === w)).length;
     document.getElementById('mode-title').textContent =
       file.replace('.csv', '') + ' (' + learnedCount + '/' + words.length + ' learned)';
+    // Disable word-count buttons that exceed the file's word count
+    document.querySelectorAll('#wordcount-toggle .setting-toggle').forEach(b => {
+      const n = Number(b.dataset.count);
+      const tooLarge = n > 0 && n >= words.length;
+      b.disabled = tooLarge;
+      b.style.opacity = tooLarge ? '0.35' : '';
+    });
+    if (quizWordCount > 0 && quizWordCount >= words.length) setQuizWordCount(0);
     showScreen('screen-mode');
   }
 
@@ -1127,9 +1154,14 @@ const uidToUsername = {
     lastMode = 'quiz';
     clearQuizTimer();
 
+    // Sample words according to the chosen word count (0 = all)
+    const wordsToUse = (quizWordCount > 0 && quizWordCount < allWords.length)
+      ? shuffle([...allWords]).slice(0, quizWordCount)
+      : allWords;
+
     // Each word appears twice: once EN→RU and once RU→EN
     const queue = [];
-    allWords.forEach(w => {
+    wordsToUse.forEach(w => {
       queue.push({ ...w, direction: 'en-ru' });
       queue.push({ ...w, direction: 'ru-en' });
     });
@@ -1324,9 +1356,9 @@ const uidToUsername = {
     if (!maxMedian) return 1.0;
     const ratio = userMedian / maxMedian;
     if (ratio < 0.25) return 1.00;
-    if (ratio < 0.50) return 0.85;
-    if (ratio < 0.75) return 0.70;
-    return 0.60;
+    if (ratio < 0.50) return 0.95;
+    if (ratio < 0.75) return 0.90;
+    return 0.85;
   }
 
   function quizTimeout() {
