@@ -738,6 +738,11 @@ const uidToUsername = {
   "nDEm8J6XDARkKRTFMkwccqMBJwx1": "Vika",   // Replace this
   "plB6o649qjaRm81NVTIv3679M2G3": "dummy"
 };
+// UIDs excluded from the public leaderboard
+const EXCLUDED_LEADERBOARD_UIDS = new Set([
+  "HNn9M03k1ZSsMTlNU4kjkLUn6B42",  // user1
+  "plB6o649qjaRm81NVTIv3679M2G3",  // dummy
+]);
 
   let currentUsername = '';
 
@@ -1729,6 +1734,7 @@ user3: {
 async function saveQuizResult(quizId, score, total, medianSeconds) {
   const user = auth.currentUser;
   if (!user) return;
+  if (EXCLUDED_LEADERBOARD_UIDS.has(user.uid)) return; // dummy / excluded users
 
   try {
     await db.collection("users")
@@ -1967,7 +1973,7 @@ function buildStatsCard(stats, timeUnit) {
     </div>`;
 }
 function buildLeaderboard(allStats, currentUserId, accentColor) {
-  const active = allStats.filter(s => s.completedCount > 0);
+  const active = allStats.filter(s => s.completedCount > 0 && !EXCLUDED_LEADERBOARD_UIDS.has(s.userId));
   if (!active.length) return '<p class="text-hint">Никто ещё не прошёл ни одного теста</p>';
   active.sort((a, b) => b.combinedScore - a.combinedScore);
   let html = '<table style="width:100%; border-collapse:collapse">';
