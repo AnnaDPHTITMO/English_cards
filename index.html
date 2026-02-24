@@ -494,7 +494,7 @@
   <div id="screen-login" class="screen active">
     <h1>English Cards</h1>
     <div class="login-box">
-      <input type="text" id="username" placeholder="Username (user1, user2, user3)">
+      <input type="text" id="username" placeholder="Username (user1, user2, user3, dummy)">
       <input type="password" id="password" placeholder="Password">
       <button class="login-btn" onclick="login()">Login</button>
       <p id="login-error" class="login-error"></p>
@@ -727,7 +727,8 @@
   const userMap = {
     "user1": "user1@quiz.app",
     "user2": "user2@quiz.app",
-    "user3": "user3@quiz.app"
+    "user3": "user3@quiz.app",
+    "dummy": "dummy@quiz123.comg"
   };
 
   // UID to username mapping - REPLACE WITH YOUR ACTUAL UIDs
@@ -735,6 +736,7 @@ const uidToUsername = {
   "HNn9M03k1ZSsMTlNU4kjkLUn6B42": "user1",
   "H7QqXqm5otcY6rkKF0ZQztqCYG72": "Katya",  // Replace this
   "nDEm8J6XDARkKRTFMkwccqMBJwx1": "Vika"   // Replace this
+  "plB6o649qjaRm81NVTIv3679M2G3": "dummy"
 };
 
   let currentUsername = '';
@@ -1758,7 +1760,8 @@ async function getAllUsersStats() {
     const userIds = [
       "HNn9M03k1ZSsMTlNU4kjkLUn6B42",  // user1
       "H7QqXqm5otcY6rkKF0ZQztqCYG72",  // user2
-      "nDEm8J6XDARkKRTFMkwccqMBJwx1"   // user3
+      "nDEm8J6XDARkKRTFMkwccqMBJwx1",   // user3
+      "plB6o649qjaRm81NVTIv3679M2G3" //dummy
     ];
 
     const filesRes = await fetch('words/files.json?t=' + Date.now());
@@ -2024,7 +2027,8 @@ async function getAllUsersGrammarStats() {
     const userIds = [
       "HNn9M03k1ZSsMTlNU4kjkLUn6B42",  // user1
       "H7QqXqm5otcY6rkKF0ZQztqCYG72",  // user2
-      "nDEm8J6XDARkKRTFMkwccqMBJwx1"   // user3
+      "nDEm8J6XDARkKRTFMkwccqMBJwx1",   // user3
+      "plB6o649qjaRm81NVTIv3679M2G3" //dummy
     ];
 
     const filesRes = await fetch('grammar/files.json?t=' + Date.now());
